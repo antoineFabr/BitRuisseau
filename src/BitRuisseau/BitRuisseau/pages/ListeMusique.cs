@@ -2,6 +2,7 @@ using BitRuisseau.data;
 using TagLib;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BitRuisseau.services;
 
 namespace BitRuisseau
 {
@@ -10,18 +11,16 @@ namespace BitRuisseau
         public Form1()
         {
             InitializeComponent();
+            string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
+            List<Song> ExistSong = Protocol.GetSongs();
+
+            ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
         }
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
         private void Load_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
-
                 ofd.Filter = "Fichier audio|*.mp3;*.wav";
                 ofd.Multiselect = true;
 
@@ -30,49 +29,35 @@ namespace BitRuisseau
                 {
                     var songs = ofd.FileNames.ToList();
                     string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> ExistSong;
-                    if (string.IsNullOrWhiteSpace(ExistSongJ))
-                    {
-                        ExistSong = new List<Song>();
-                    }
-                    else
-                    {
-                        ExistSong = JsonSerializer.Deserialize<List<Song>>(ExistSongJ);
-                    }
+                    List<Song> ExistSong = Protocol.GetSongs();
+
+
                     songs.ForEach(x =>
                     {
                         FileInfo file = new FileInfo(x);
                         var tfile = TagLib.File.Create(x);
-
-
                         string name = Path.GetFileNameWithoutExtension(file.Name);
-                        Song newSong = new Song() { path = file.FullName, name = name, duréeSeconde = tfile.Properties.Duration, album = tfile.Tag.Album, artist = tfile.Tag.FirstPerformer};
-                       
-
+                        Song newSong = new Song() { 
+                            path = file.FullName, 
+                            Title = name, 
+                            Duration = tfile.Properties.Duration,  
+                            Artist = tfile.Tag.AlbumArtists[0], 
+                            Featuring = tfile.Tag.AlbumArtists, 
+                            Size= (int)file.Length, 
+                            Year =  (int)tfile.Tag.Year 
+                        };
                         ExistSong.Add(newSong);
-                        var newSongJ = JsonSerializer.Serialize(newSong);
-                        System.IO.File.WriteAllText(jsonPath, newSongJ);
-
                     });
 
-               
-                    
+
+                    var newSongJ = JsonSerializer.Serialize(ExistSong);
+                    System.IO.File.WriteAllText(jsonPath, newSongJ);
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
-                    string SongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> NewSong = JsonSerializer.Deserialize<List<Song>>(ExistSongJ);
-                    ExistSong.ForEach(x => ListeSong.Items.Add(x.name));
 
-
-
-
+                    ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
                 }
             }
-        }
-
-        private void Form1_Load_1(object sender, EventArgs e)
-        {
-
         }
     }
 }

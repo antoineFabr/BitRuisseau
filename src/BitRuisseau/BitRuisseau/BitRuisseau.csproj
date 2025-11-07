@@ -9,16 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="services\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="taglib-sharp-netstandard2.0" Version="2.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="data\song.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
