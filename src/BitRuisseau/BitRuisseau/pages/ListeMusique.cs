@@ -2,6 +2,7 @@ using BitRuisseau.data;
 using TagLib;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BitRuisseau.services;
 
 namespace BitRuisseau
 {
@@ -12,23 +13,19 @@ namespace BitRuisseau
             InitializeComponent();
         }
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
 
         private void Load_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog ofd = new OpenFileDialog())
+            using (FolderBrowserDialog ofd = new FolderBrowserDialog())
             {
 
-                ofd.Filter = "Fichier audio|*.mp3;*.wav";
-                ofd.Multiselect = true;
-
-                string[] extensions = { ".mp3", ".wav" };
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
-                    var songs = ofd.FileNames.ToList();
+                    string selectedFolder = ofd.SelectedPath;
+
+                    var songs = Directory.GetFiles(selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
+                        .Where(f => f.EndsWith(".wav") || f.EndsWith(".mp3"))
+                        .ToList();
                     string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
                     List<Song> ExistSong;
                     if (string.IsNullOrWhiteSpace(ExistSongJ))
@@ -46,22 +43,30 @@ namespace BitRuisseau
 
 
                         string name = Path.GetFileNameWithoutExtension(file.Name);
-                        Song newSong = new Song() { path = file.FullName, name = name, duréeSeconde = tfile.Properties.Duration, album = tfile.Tag.Album, artist = tfile.Tag.FirstPerformer};
-                       
+                        Song newSong = new Song()
+                        {
+                            Path = file.FullName,
+                            Title = tfile.Tag.Title,
+                            Duration = tfile.Properties.Duration,
+                            Year = Convert.ToInt32(tfile.Tag.Year),
+                            album = tfile.Tag.Album,
+                            Size = (int)file.Length,
+                            Artist = tfile.Tag.AlbumArtists[0],
+
+                        };
+
 
                         ExistSong.Add(newSong);
-                        var newSongJ = JsonSerializer.Serialize(newSong);
-                        System.IO.File.WriteAllText(jsonPath, newSongJ);
+
 
                     });
 
-               
-                    
+
+                    var ExistSongJUpdated = JsonSerializer.Serialize(ExistSong, new JsonSerializerOptions { WriteIndented = true });
+                    System.IO.File.WriteAllText(jsonPath, ExistSongJUpdated);
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
-                    string SongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> NewSong = JsonSerializer.Deserialize<List<Song>>(ExistSongJ);
-                    ExistSong.ForEach(x => ListeSong.Items.Add(x.name));
+                    ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
 
 
 
@@ -70,8 +75,39 @@ namespace BitRuisseau
             }
         }
 
-        private void Form1_Load_1(object sender, EventArgs e)
+
+
+        private void refresh_Click(object sender, EventArgs e)
         {
+            mqtt_client protocol = new mqtt_client();
+            // on récupere toutes les ip pour demander le catalogue
+            List<string> med = protocol.GetOnlineMediatheque().ToList();
+
+            List<ISong> Songs = new List<ISong>();
+            // pour chaque IP on lui demande son catalogue et on ajoute chaque musique à la liste des songs remote
+            med.ForEach(x =>
+            {
+                List<ISong> newSongs = protocol.AskCatalog(x);
+
+                newSongs.ForEach(x => Songs.Add(x));
+            });
+
+            ListeRemoteSong.Items.Clear();
+            Songs.ForEach(x => ListeRemoteSong.Items.Add(x.Title));
+        }
+
+        private void ListeRemoteSong_OnClickItems(object sender, EventArgs e)
+        {
+
+        }
+
+        private void ListeSong_SelectedIndexChanged(object sender, EventArgs e)
+        {
+        }
+
+        private void ListeSong_DoubleClick(object sender, EventArgs e)
+        {
+            MessageBox.Show("click");
 
         }
     }
