@@ -1,6 +1,8 @@
 using BitRuisseau.data;
 using BitRuisseau.services;
 using MQTTnet;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TagLib;
@@ -13,7 +15,7 @@ namespace BitRuisseau
         {
             InitializeComponent();
             string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
-            List<Song> ExistSong = Protocol.GetSongs();
+            List<Song> ExistSong = mqtt_client.GetSongs();
             Connect();
             ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
         }
@@ -51,7 +53,7 @@ namespace BitRuisseau
                         .Where(f => f.EndsWith(".wav") || f.EndsWith(".mp3"))
                         .ToList();
                     string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> ExistSong = Protocol.GetSongs();
+                    List<Song> ExistSong = mqtt_client.GetSongs();
 
 
                     songs.ForEach(x =>
@@ -67,8 +69,7 @@ namespace BitRuisseau
                             Year = Convert.ToInt32(tfile.Tag.Year),
                             album = tfile.Tag.Album,
                             Size = (int)file.Length,
-                            Artist = tfile.Tag.AlbumArtists[0],
-
+                            Artist = tfile.Tag.AlbumArtists[0]
                         };
 
 
@@ -96,13 +97,20 @@ namespace BitRuisseau
         {
             mqtt_client protocol = new mqtt_client();
             // on récupere toutes les ip pour demander le catalogue
-            List<string> med = protocol.GetOnlineMediatheque().ToList();
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            services.Message msg = new services.Message() { Action = "askOnline", Recipient = "0.0.0.0", Sender = localIp };
+            List<string> med = protocol.GetOnlineMediatheque(msg).ToList();
 
             List<ISong> Songs = new List<ISong>();
             // pour chaque IP on lui demande son catalogue et on ajoute chaque musique à la liste des songs remote
             med.ForEach(x =>
             {
-                List<ISong> newSongs = protocol.AskCatalog(x);
+                services.Message msg = new services.Message() { Action = "askCatalog", Recipient = x, Sender = localIp };
+            
+                List <ISong> newSongs = protocol.AskCatalog(msg);
 
                 newSongs.ForEach(x => Songs.Add(x));
             });

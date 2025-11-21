@@ -96,6 +96,7 @@ namespace BitRuisseau.services
             switch (msg.Action)
             {
                 case "askOnline":
+                    SayOnline();
                     break;
 
                 case "online":
@@ -119,7 +120,7 @@ namespace BitRuisseau.services
             }
         }
 
-        public string[] GetOnlineMediatheque()
+        public string[] GetOnlineMediatheque(Message msg)
         {
             // demande mqtt via mqtt
             string[] mediatheque = ["192.168.34.5", "168.143.53.43"];
@@ -128,10 +129,15 @@ namespace BitRuisseau.services
 
         public void SayOnline()
         {
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            Message msg = new Message() { Action = "online", Sender = localIp, Recipient = "0.0.0.0"};
             // via mqtt
         }
 
-        public List<ISong> AskCatalog(string name)
+        public List<ISong> AskCatalog(Message msg)
         {
 
             // demande mqtt
@@ -147,7 +153,7 @@ namespace BitRuisseau.services
         }
 
 
-        public void AskMedia(string name, int startByte, int endByte)
+        public void AskMedia(Message msg)
         {
 
         }
@@ -156,6 +162,21 @@ namespace BitRuisseau.services
         public void SendMedia(string name, int startByte, int endByte)
         {
 
+        }
+        public static List<Song> GetSongs()
+        {
+            string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
+            string SongJ = System.IO.File.ReadAllText(jsonPath);
+            List<Song> Songs;
+            if (string.IsNullOrWhiteSpace(SongJ))
+            {
+                Songs = new List<Song>();
+            }
+            else
+            {
+                Songs = JsonSerializer.Deserialize<List<Song>>(SongJ);
+            }
+            return Songs;
         }
     }
 }
