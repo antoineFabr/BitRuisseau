@@ -29,6 +29,11 @@ namespace BitRuisseau
             {
                 MessageBox.Show("Impossible de se connecter au broker mqtt");
             }
+            else
+            {
+                MessageBox.Show("Connexion réussi au broker mqtt");
+
+            }
         }
 
         private void Load_Click(object sender, EventArgs e)
