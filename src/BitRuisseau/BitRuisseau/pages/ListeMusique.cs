@@ -71,28 +71,16 @@ namespace BitRuisseau
                             Size = (int)file.Length,
                             Artist = tfile.Tag.AlbumArtists[0]
                         };
-
-
                         ExistSong.Add(newSong);
-
-
                     });
-
-
                     var ExistSongJUpdated = JsonSerializer.Serialize(ExistSong, new JsonSerializerOptions { WriteIndented = true });
                     System.IO.File.WriteAllText(jsonPath, ExistSongJUpdated);
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
                     ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
-
-
-
                 }
             }
         }
-
-
-
         private void refresh_Click(object sender, EventArgs e)
         {
             mqtt_client protocol = new mqtt_client();

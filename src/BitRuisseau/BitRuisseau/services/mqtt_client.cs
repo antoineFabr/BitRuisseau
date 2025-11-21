@@ -100,6 +100,7 @@ namespace BitRuisseau.services
                     break;
 
                 case "online":
+
                     break;
 
                 case "askCatalog":
@@ -120,9 +121,26 @@ namespace BitRuisseau.services
             }
         }
 
+        public async void AskOnline()
+        {
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            Message msg = new Message() { Action = "askOnline", Sender = localIp, Recipient = "0.0.0.0" };
+
+            string payload = JsonSerializer.Serialize(msg);
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic("BitRuisseau")
+                .WithPayload(payload)
+                .Build();
+
+            await mqttClient.PublishAsync(message);
+        }
         public string[] GetOnlineMediatheque(Message msg)
         {
             // demande mqtt via mqtt
+
             string[] mediatheque = ["192.168.34.5", "168.143.53.43"];
             return mediatheque;
         }
