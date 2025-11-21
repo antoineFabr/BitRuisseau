@@ -1,8 +1,9 @@
 using BitRuisseau.data;
-using TagLib;
+using BitRuisseau.services;
+using MQTTnet;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using BitRuisseau.services;
+using TagLib;
 
 namespace BitRuisseau
 {
@@ -11,14 +12,32 @@ namespace BitRuisseau
         public Form1()
         {
             InitializeComponent();
+            string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
+            List<Song> ExistSong = Protocol.GetSongs();
+            Connect();
+            ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
         }
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
+
+        private async void Connect()
+        {
+            mqtt_client mqttClient = new mqtt_client();
+
+            bool isConnect = await mqttClient.ConnectToBroker();
+
+            if (!isConnect)
+            {
+                MessageBox.Show("Impossible de se connecter au broker mqtt");
+            }
+        }
 
         private void Load_Click(object sender, EventArgs e)
         {
             using (FolderBrowserDialog ofd = new FolderBrowserDialog())
             {
 
+
+                string[] extensions = { ".mp3", ".wav" };
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     string selectedFolder = ofd.SelectedPath;
@@ -27,21 +46,13 @@ namespace BitRuisseau
                         .Where(f => f.EndsWith(".wav") || f.EndsWith(".mp3"))
                         .ToList();
                     string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> ExistSong;
-                    if (string.IsNullOrWhiteSpace(ExistSongJ))
-                    {
-                        ExistSong = new List<Song>();
-                    }
-                    else
-                    {
-                        ExistSong = JsonSerializer.Deserialize<List<Song>>(ExistSongJ);
-                    }
+                    List<Song> ExistSong = Protocol.GetSongs();
+
+
                     songs.ForEach(x =>
                     {
                         FileInfo file = new FileInfo(x);
                         var tfile = TagLib.File.Create(x);
-
-
                         string name = Path.GetFileNameWithoutExtension(file.Name);
                         Song newSong = new Song()
                         {
@@ -67,7 +78,6 @@ namespace BitRuisseau
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
                     ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
-
 
 
 
