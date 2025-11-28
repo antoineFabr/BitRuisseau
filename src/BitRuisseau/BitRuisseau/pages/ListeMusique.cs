@@ -14,16 +14,21 @@ namespace BitRuisseau
         public Form1()
         {
             InitializeComponent();
+
             string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
+
             List<Song> ExistSong = mqtt_client.GetSongs();
             Connect();
             ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
         }
+        mqtt_client mqttClient = new mqtt_client();
+
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
+        string jsonPathMedia = Path.Combine(Application.StartupPath, "data", "Mediatheque.json");
+
 
         private async void Connect()
         {
-            mqtt_client mqttClient = new mqtt_client();
 
             bool isConnect = await mqttClient.ConnectToBroker();
 
@@ -83,28 +88,12 @@ namespace BitRuisseau
         }
         private void refresh_Click(object sender, EventArgs e)
         {
-            mqtt_client protocol = new mqtt_client();
-            // on récupere toutes les ip pour demander le catalogue
-            string localIp = Dns.GetHostEntry(Dns.GetHostName())
-                .AddressList
-                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
-                .ToString();
-            services.Message msg = new services.Message() { Action = "askOnline", Recipient = "0.0.0.0", Sender = localIp };
-            List<string> med = protocol.GetOnlineMediatheque(msg).ToList();
+            mqttClient.AskOnline();
+            string mediaJ = System.IO.File.ReadAllText(jsonPathMedia);
 
-            List<ISong> Songs = new List<ISong>();
-            // pour chaque IP on lui demande son catalogue et on ajoute chaque musique à la liste des songs remote
-            med.ForEach(x =>
-            {
-                services.Message msg = new services.Message() { Action = "askCatalog", Recipient = x, Sender = localIp };
-            
-                List <ISong> newSongs = protocol.AskCatalog(msg);
+            Mediatheque media = JsonSerializer.Deserialize<Mediatheque>(mediaJ);
+            MessageBox.Show(mediaJ);
 
-                newSongs.ForEach(x => Songs.Add(x));
-            });
-
-            ListeRemoteSong.Items.Clear();
-            Songs.ForEach(x => ListeRemoteSong.Items.Add(x.Title));
         }
 
         private void ListeRemoteSong_OnClickItems(object sender, EventArgs e)
