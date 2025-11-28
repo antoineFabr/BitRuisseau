@@ -100,7 +100,7 @@ namespace BitRuisseau.services
                     break;
 
                 case "online":
-
+                    GetOnlineMediatheque(msg);
                     break;
 
                 case "askCatalog":
@@ -140,18 +140,40 @@ namespace BitRuisseau.services
         public string[] GetOnlineMediatheque(Message msg)
         {
             // demande mqtt via mqtt
+            string jsonPath = Path.Combine(Application.StartupPath, "data", "Mediatheque.json");
 
-            string[] mediatheque = ["192.168.34.5", "168.143.53.43"];
-            return mediatheque;
+            string mediathequesJ = System.IO.File.ReadAllText(jsonPath);
+            Mediatheque mediatheques = JsonSerializer.Deserialize<Mediatheque>(mediathequesJ);
+            var mediathequeListe = mediatheques.mediatheques.ToList();
+            string mediatheque = msg.Sender;
+
+            mediathequeListe.Add(mediatheque);
+
+            var mediaArray = mediathequeListe.ToArray();
+
+            var newMediaJ = JsonSerializer.Serialize(mediaArray);
+
+            System.IO.File.WriteAllText(jsonPath, newMediaJ);
+
+
+            return mediaArray;
         }
 
-        public void SayOnline()
+        public async void SayOnline()
         {
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
                 .First(x => x.AddressFamily == AddressFamily.InterNetwork)
                 .ToString();
             Message msg = new Message() { Action = "online", Sender = localIp, Recipient = "0.0.0.0"};
+            string payload = JsonSerializer.Serialize(msg);
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic("BitRuisseau")
+                .WithPayload(payload)
+                .Build();
+
+            await mqttClient.PublishAsync(message);
+
             // via mqtt
         }
 
