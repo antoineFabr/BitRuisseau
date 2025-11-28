@@ -123,6 +123,7 @@ namespace BitRuisseau.services
 
         public async void AskOnline()
         {
+            MessageBox.Show("AskOnline");
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
                 .First(x => x.AddressFamily == AddressFamily.InterNetwork)
@@ -139,24 +140,42 @@ namespace BitRuisseau.services
         }
         public string[] GetOnlineMediatheque(Message msg)
         {
-            // demande mqtt via mqtt
+
+            // 1. Définir le chemin
             string jsonPath = Path.Combine(Application.StartupPath, "data", "Mediatheque.json");
 
+            // 2. Vérifier si le fichier existe pour éviter un crash
+            if (!System.IO.File.Exists(jsonPath))
+            {
+                // Gérer l'erreur ou créer un fichier vide par défaut
+                System.IO.File.WriteAllText(jsonPath, "{\"mediatheques\": []}");
+            }
+
+            // 3. Lire le JSON
             string mediathequesJ = System.IO.File.ReadAllText(jsonPath);
-            Mediatheque mediatheques = JsonSerializer.Deserialize<Mediatheque>(mediathequesJ);
-            var mediathequeListe = mediatheques.mediatheques.ToList();
-            string mediatheque = msg.Sender;
 
-            mediathequeListe.Add(mediatheque);
+            Mediatheque mediathequesObj = JsonSerializer.Deserialize<Mediatheque>(mediathequesJ) ?? new Mediatheque();
 
-            var mediaArray = mediathequeListe.ToArray();
+            if (mediathequesObj.mediatheques == null)
+            {
+                mediathequesObj.mediatheques = new string[0]; 
+            }
 
-            var newMediaJ = JsonSerializer.Serialize(mediaArray);
+            var listeModifiable = mediathequesObj.mediatheques.ToList();
+            string nouveauMedia = msg.Sender;
 
-            System.IO.File.WriteAllText(jsonPath, newMediaJ);
+            if (!listeModifiable.Contains(nouveauMedia))
+            {
+                listeModifiable.Add(nouveauMedia);
+            }
 
+            mediathequesObj.mediatheques = listeModifiable.ToArray();
 
-            return mediaArray;
+            var newJsonData = JsonSerializer.Serialize(mediathequesObj, new JsonSerializerOptions { WriteIndented = true });
+
+            System.IO.File.WriteAllText(jsonPath, newJsonData);
+
+            return listeModifiable.ToArray();
         }
 
         public async void SayOnline()
