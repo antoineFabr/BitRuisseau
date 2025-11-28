@@ -12,7 +12,7 @@ using System.Text.Json;
 
 namespace BitRuisseau.services
 {
-    public class mqtt_client : IProtocol
+    public class mqtt_client
     {
         private MqttClientFactory factory = new MqttClientFactory();
         public static string brokerHost = "mqtt.blue.section-inf.ch";
@@ -104,9 +104,11 @@ namespace BitRuisseau.services
                     break;
 
                 case "askCatalog":
+                    SendCatalog(msg.Sender);
                     break;
 
                 case "sendCatalog":
+                    GetCatalog(msg);
                     break;
 
                 case "askMedia":
@@ -123,7 +125,6 @@ namespace BitRuisseau.services
 
         public async void AskOnline()
         {
-            MessageBox.Show("AskOnline");
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
                 .First(x => x.AddressFamily == AddressFamily.InterNetwork)
@@ -195,20 +196,77 @@ namespace BitRuisseau.services
 
             // via mqtt
         }
+        
+        public async void AskCatalog(Message msg)
+        {
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            string payload = JsonSerializer.Serialize(msg);
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic("BitRuisseau")
+                .WithPayload(payload)
+                .Build();
 
-        public List<ISong> AskCatalog(Message msg)
+            await mqttClient.PublishAsync(message);
+            // demande mqtt
+
+        }
+        public List<Catalog> GetCatalog(Message msg)
         {
 
-            // demande mqtt
-            List<ISong> songs = new List<ISong>();
+            string jsonPath = Path.Combine(Application.StartupPath, "data", "Catalog.json");
 
-            return songs;
+            // 2. Vérifier si le fichier existe pour éviter un crash
+            if (!System.IO.File.Exists(jsonPath))
+            {
+                // Gérer l'erreur ou créer un fichier vide par défaut
+                System.IO.File.WriteAllText(jsonPath, "{}");
+            }
+
+            // 3. Lire le JSON
+            string CatalogsJ = System.IO.File.ReadAllText(jsonPath);
+            MessageBox.Show(CatalogsJ);
+
+            List<Catalog> CatalogsObj = JsonSerializer.Deserialize<List<Catalog>>(CatalogsJ) ?? new List<Catalog>();
+
+
+
+            var listeModifiable = CatalogsObj.ToList();
+            List<ISong> newMusic = msg.SongList;
+
+            var cat = new Catalog() { sons = newMusic, holder = msg.Sender };
+            listeModifiable.Add(cat);
+
+            
+
+            var newJsonData = JsonSerializer.Serialize(listeModifiable, new JsonSerializerOptions { WriteIndented = true });
+
+            System.IO.File.WriteAllText(jsonPath, newJsonData);
+
+            return listeModifiable;
         }
 
-
-        public void SendCatalog(string name)
+        public async void SendCatalog(string name)
         {
-            
+            string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
+            string songJ = File.ReadAllText(jsonPath);
+            var songs = JsonSerializer.Deserialize<List<Song>>(songJ);
+            MessageBox.Show(songJ);
+
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            Message msg = new Message() { Action = "sendCatalog", Sender = localIp, Recipient = name, SongList = songs };
+            string payload = JsonSerializer.Serialize(msg);
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic("BitRuisseau")
+                .WithPayload(payload)
+                .Build();
+
+            await mqttClient.PublishAsync(message);
         }
 
 

@@ -21,6 +21,5 @@ namespace BitRuisseau.data
         public TimeSpan Duration { get; set; }
 
 
-
     }
 }

@@ -74,7 +74,10 @@ namespace BitRuisseau
                             Year = Convert.ToInt32(tfile.Tag.Year),
                             album = tfile.Tag.Album,
                             Size = (int)file.Length,
-                            Artist = tfile.Tag.AlbumArtists[0]
+                            Artist = tfile.Tag.AlbumArtists[0],
+                            Featuring = tfile.Tag.AlbumArtists
+
+
                         };
                         ExistSong.Add(newSong);
                     });
@@ -92,8 +95,16 @@ namespace BitRuisseau
             string mediaJ = System.IO.File.ReadAllText(jsonPathMedia);
 
             Mediatheque media = JsonSerializer.Deserialize<Mediatheque>(mediaJ);
-            MessageBox.Show(mediaJ);
-
+            List<string> mediaList = media.mediatheques.ToList();
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+            mediaList.ForEach(x =>
+            {
+                services.Message msg = new services.Message() { Action = "askCatalog", Sender = localIp, Recipient = x };
+                mqttClient.AskCatalog(msg);
+            });
         }
 
         private void ListeRemoteSong_OnClickItems(object sender, EventArgs e)
