@@ -75,6 +75,7 @@
             ListeRemoteSong.Size = new Size(255, 229);
             ListeRemoteSong.TabIndex = 4;
             ListeRemoteSong.SelectedIndexChanged += ListeRemoteSong_OnClickItems;
+            ListeRemoteSong.DoubleClick += ListeRemoteSong_DoubleClick;
             // 
             // label1
             // 

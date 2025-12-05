@@ -49,9 +49,6 @@ namespace BitRuisseau
         {
             using (FolderBrowserDialog ofd = new FolderBrowserDialog())
             {
-
-
-                string[] extensions = { ".mp3", ".wav" };
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     string selectedFolder = ofd.SelectedPath;
@@ -59,33 +56,70 @@ namespace BitRuisseau
                     var songs = Directory.GetFiles(selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
                         .Where(f => f.EndsWith(".wav") || f.EndsWith(".mp3"))
                         .ToList();
-                    string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
-                    List<Song> ExistSong = mqtt_client.GetSongs();
 
+                    // Relecture propre du fichier existant
+                    string jsonContent = System.IO.File.Exists(jsonPath) ? System.IO.File.ReadAllText(jsonPath) : "";
+                    List<Song> ExistSong = string.IsNullOrWhiteSpace(jsonContent)
+                        ? new List<Song>()
+                        : JsonSerializer.Deserialize<List<Song>>(jsonContent);
 
                     songs.ForEach(x =>
                     {
-                        FileInfo file = new FileInfo(x);
-                        var tfile = TagLib.File.Create(x);
-                        string name = Path.GetFileNameWithoutExtension(file.Name);
-                        Song newSong = new Song()
+                        try
                         {
-                            Path = file.FullName,
-                            Title = tfile.Tag.Title,
-                            Duration = tfile.Properties.Duration,
-                            Year = Convert.ToInt32(tfile.Tag.Year),
-                            album = tfile.Tag.Album,
-                            Size = (int)file.Length,
-                            Artist = tfile.Tag.AlbumArtists[0],
-                            Featuring = tfile.Tag.AlbumArtists,
-                            Hash = Helper.HashFile(file.FullName)
+                            FileInfo file = new FileInfo(x);
+                            var tfile = TagLib.File.Create(x);
 
+                            // --- CORRECTION CRASH ARTISTE ---
+                            // On vérifie si AlbumArtists contient quelque chose, sinon on cherche Performers, sinon "Inconnu"
+                            string safeArtist = "Artiste Inconnu";
+                            if (tfile.Tag.AlbumArtists != null && tfile.Tag.AlbumArtists.Length > 0)
+                            {
+                                safeArtist = tfile.Tag.AlbumArtists[0];
+                            }
+                            else if (tfile.Tag.Performers != null && tfile.Tag.Performers.Length > 0)
+                            {
+                                safeArtist = tfile.Tag.Performers[0];
+                            }
 
-                        };
-                        ExistSong.Add(newSong);
+                            // --- CORRECTION TITRE ---
+                            // Si pas de titre dans les tags, on met le nom du fichier
+                            string safeTitle = string.IsNullOrWhiteSpace(tfile.Tag.Title)
+                                ? Path.GetFileNameWithoutExtension(file.Name)
+                                : tfile.Tag.Title;
+
+                            Song newSong = new Song()
+                            {
+                                Path = file.FullName,
+                                Title = safeTitle,
+                                Duration = tfile.Properties.Duration,
+                                Year = (int)tfile.Tag.Year,
+                                album = tfile.Tag.Album ?? "Album Inconnu", // Sécurité null
+                                Size = (int)file.Length,
+
+                                // Utilisation de la variable sécurisée
+                                Artist = safeArtist,
+
+                                // On garde le tableau complet pour le featuring, mais on vérifie null
+                                Featuring = tfile.Tag.AlbumArtists ?? new string[0],
+
+                                Hash = Helper.HashFile(file.FullName),
+
+                                // IMPORTANT : On ajoute l'extension pour le téléchargement futur
+                                Extension = file.Extension
+                            };
+
+                            ExistSong.Add(newSong);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Impossible de lire le fichier {x} : {ex.Message}");
+                        }
                     });
+
                     var ExistSongJUpdated = JsonSerializer.Serialize(ExistSong, new JsonSerializerOptions { WriteIndented = true });
                     System.IO.File.WriteAllText(jsonPath, ExistSongJUpdated);
+
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
                     ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
@@ -133,8 +167,53 @@ namespace BitRuisseau
 
         private void ListeSong_DoubleClick(object sender, EventArgs e)
         {
-            MessageBox.Show("click");
+           
 
+        }
+
+        private void ListeRemoteSong_DoubleClick(object sender, EventArgs e)
+        {
+            MessageBox.Show("Click double download");
+            if (ListeRemoteSong.SelectedItem == null) return;
+
+            // 2. Récupérer le titre sur lequel on a cliqué
+            string selectedTitle = ListeRemoteSong.SelectedItem.ToString();
+
+            // 3. Charger le fichier Catalog.json pour retrouver les infos techniques (Hash, Holders...)
+            string jsonPathCat = Path.Combine(Application.StartupPath, "data", "Catalog.json");
+
+            if (!System.IO.File.Exists(jsonPathCat))
+            {
+                MessageBox.Show("Catalogue introuvable.");
+                return;
+            }
+
+            try
+            {
+                string jsonContent = System.IO.File.ReadAllText(jsonPathCat);
+                List<Catalog> globalCatalog = JsonSerializer.Deserialize<List<Catalog>>(jsonContent);
+
+                // 4. Trouver l'objet Catalog qui correspond au titre sélectionné
+                // Note : Si deux musiques ont le même titre, cela prendra la première trouvée.
+                var songToDownload = globalCatalog.FirstOrDefault(c => c.Title == selectedTitle);
+
+                if (songToDownload != null)
+                {
+                    // Feedback visuel pour l'utilisateur
+                    MessageBox.Show($"Demande de téléchargement envoyée pour : {songToDownload.Title}\nSources disponibles : {songToDownload.Holders.Count}");
+
+                    // 5. Lancer le téléchargement via MQTT
+                    mqttClient.DownloadSong(songToDownload);
+                }
+                else
+                {
+                    MessageBox.Show("Erreur : Impossible de retrouver les infos de cette musique dans le catalogue.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur de lecture du catalogue : {ex.Message}");
+            }
         }
     }
 }

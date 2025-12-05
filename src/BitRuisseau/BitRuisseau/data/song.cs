@@ -22,6 +22,7 @@ namespace BitRuisseau.data
         [JsonIgnore]
         public string album { get; set; }
         public TimeSpan Duration { get; set; }
+        public string Extension { get; set; }
 
 
     }

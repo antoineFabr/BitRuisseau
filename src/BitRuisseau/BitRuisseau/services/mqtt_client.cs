@@ -113,9 +113,11 @@ namespace BitRuisseau.services
                     break;
 
                 case "askMedia":
+                    SendMedia(msg);
                     break;
 
                 case "sendMedia":
+                    HandleReceivedMedia(msg);
                     break;
 
                 default:
@@ -326,15 +328,224 @@ namespace BitRuisseau.services
         }
 
 
-        public void AskMedia(Message msg)
+        public async Task AskMedia(Message msg)
         {
+            try
+            {
+                string payload = JsonSerializer.Serialize(msg);
+                var message = new MqttApplicationMessageBuilder()
+                    .WithTopic("BitRuisseau")
+                    .WithPayload(payload)
+                    .Build();
 
+                await mqttClient.PublishAsync(message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de l'envoi de AskMedia : {ex.Message}");
+            }
+        }
+
+        public async void SendMedia(Message msg)
+        {
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+               .AddressList
+               .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+               .ToString();
+            MessageBox.Show("caca");
+            // 1. Vérifier si la demande m'est destinée
+            // (Note : msg.Recipient peut être une IP ou un Hostname, vérifiez les deux si besoin)
+            if (msg.Recipient != localIp && msg.Recipient != "0.0.0.0") return;
+
+            MessageBox.Show($"Quelqu'un ({msg.Sender}) me demande un morceau de musique (Hash: {msg.Hash})");
+
+            // 2. Trouver le fichier correspondant au Hash dans ma liste locale
+            List<Song> mySongs = GetSongs();
+            Song requestedSong = mySongs.FirstOrDefault(s => s.Hash == msg.Hash);
+
+            if (requestedSong == null || !File.Exists(requestedSong.Path))
+            {
+                MessageBox.Show("Erreur : Je ne possède pas ce fichier ou le chemin est incorrect.");
+
+                return;
+            }
+
+            try
+            {
+                // 3. Lire UNIQUEMENT les octets demandés (FileStream)
+                using (FileStream fs = new FileStream(requestedSong.Path, FileMode.Open, FileAccess.Read))
+                {
+                    int start = msg.StartByte ?? 0;
+                    int end = msg.EndByte ?? (int)fs.Length;
+
+                    // Sécurité : ne pas lire plus loin que la fin du fichier
+                    if (end > fs.Length) end = (int)fs.Length;
+
+                    int lengthToRead = end - start;
+                    if (lengthToRead <= 0) return;
+
+                    byte[] buffer = new byte[lengthToRead];
+
+                    // On se déplace au StartByte
+                    fs.Seek(start, SeekOrigin.Begin);
+                    // On lit le nombre d'octets requis
+                    int bytesRead = fs.Read(buffer, 0, lengthToRead);
+
+                    // 4. Encodage en Base64 (selon protocole.md)
+                    string base64Data = Convert.ToBase64String(buffer);
+
+                    // 5. Préparation de la réponse sendMedia
+                    Message responseMsg = new Message()
+                    {
+                        Action = "sendMedia",
+                        Sender = localIp,
+                        Recipient = msg.Sender, // Je réponds à celui qui a demandé
+                        Hash = msg.Hash,
+                        StartByte = start,
+                        EndByte = end,
+                        SongData = base64Data // Le contenu audio
+                    };
+
+                    // 6. Envoi
+                    string payload = JsonSerializer.Serialize(responseMsg);
+                    var mqttMessage = new MqttApplicationMessageBuilder()
+                        .WithTopic("BitRuisseau")
+                        .WithPayload(payload)
+                        .Build();
+
+                    await mqttClient.PublishAsync(mqttMessage);
+                    MessageBox.Show($"Segment envoyé ! ({bytesRead} octets)");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur lecture/envoi fichier : {ex.Message}");
+            }
         }
 
 
-        public void SendMedia(string name, int startByte, int endByte)
+        public async void DownloadSong(Catalog songToDownload)
         {
+            // 1. Vérifications de base
+            if (songToDownload.Holders == null || songToDownload.Holders.Count == 0)
+            {
+                MessageBox.Show("Aucune source disponible pour ce fichier.");
+                return;
+            }
 
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+                .AddressList
+                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+                .ToString();
+
+            int totalSize = songToDownload.Size;
+            int numberOfHolders = songToDownload.Holders.Count;
+
+            // 2. Calcul de la taille d'un morceau (Division entière)
+            int chunkSize = totalSize / numberOfHolders;
+            int currentStart = 0;
+
+            Console.WriteLine($"Début du téléchargement de '{songToDownload.Title}' via {numberOfHolders} sources.");
+
+            // 3. Boucle sur chaque possesseur pour lui demander sa part
+            for (int i = 0; i < numberOfHolders; i++)
+            {
+                string holderIp = songToDownload.Holders[i];
+
+                // On ne se demande pas à soi-même si on est dans la liste (cas rare mais possible)
+                if (holderIp == localIp) continue;
+
+                // Calcul de la fin du segment
+                // Si c'est le dernier holder, il prend tout ce qui reste (pour gérer les divisions impaires)
+                int currentEnd = (i == numberOfHolders - 1) ? totalSize : (currentStart + chunkSize);
+
+                // Création du message respectant le protocole.md
+                Message msg = new Message()
+                {
+                    Action = "askMedia",
+                    Sender = localIp,
+                    Recipient = holderIp, // On cible précisément cette personne
+                    Hash = songToDownload.Hash, // L'identifiant unique du fichier
+                    StartByte = currentStart,
+                    EndByte = currentEnd,
+                    SongList = null,
+                    SongData = null
+                };
+
+                Console.WriteLine($"-> Demande à {holderIp} : Octets {currentStart} à {currentEnd}");
+
+                // Envoi de la requête MQTT
+                await AskMedia(msg);
+
+                // Le prochain segment commence là où celui-ci finit
+                currentStart = currentEnd;
+            }
+        }
+        // Variable pour empêcher deux écritures simultanées sur le même fichier
+        private static readonly object fileLock = new object();
+
+        public void HandleReceivedMedia(Message msg)
+        {
+            // 1. Validation de base
+            if (string.IsNullOrEmpty(msg.SongData) || string.IsNullOrEmpty(msg.Hash)) return;
+
+            try
+            {
+                // 2. Convertir les données reçues (Base64 -> Bytes)
+                byte[] data = Convert.FromBase64String(msg.SongData);
+
+                // 3. Déterminer le nom du fichier et le dossier
+                // On utilise le Hash comme nom de fichier temporaire pour éviter les conflits de noms
+                // Idéalement, on renommera le fichier avec son Titre une fois fini, ou on cherche le titre via le Hash maintenant.
+                string downloadFolder = Path.Combine(Application.StartupPath, "data", "Downloads");
+
+                // Créer le dossier Downloads s'il n'existe pas
+                if (!Directory.Exists(downloadFolder))
+                {
+                    Directory.CreateDirectory(downloadFolder);
+                }
+
+                // On essaie de retrouver l'extension originale via le catalogue, sinon .mp3 par défaut
+                string extension = ".mp3";
+
+                // Petite astuce : on regarde dans le catalogue global pour voir si on connait ce Hash
+                // (Optionnel : améliore juste le nom du fichier)
+                string catalogPath = Path.Combine(Application.StartupPath, "data", "Catalog.json");
+                if (File.Exists(catalogPath))
+                {
+                    var catalog = JsonSerializer.Deserialize<List<Catalog>>(File.ReadAllText(catalogPath));
+                    var songInfo = catalog?.FirstOrDefault(s => s.Hash == msg.Hash);
+                    if (songInfo != null && !string.IsNullOrEmpty(songInfo.Extension))
+                    {
+                        extension = songInfo.Extension;
+                    }
+                }
+
+                string filePath = Path.Combine(downloadFolder, $"{msg.Hash}{extension}");
+
+                // 4. Écriture sécurisée sur le disque
+                lock (fileLock)
+                {
+                    // OpenOrCreate : Crée le fichier si c'est le premier paquet, sinon l'ouvre
+                    using (FileStream fs = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite))
+                    {
+                        // IMPORTANT : On se déplace à l'endroit exact où ce morceau doit aller
+                        if (msg.StartByte.HasValue)
+                        {
+                            fs.Seek(msg.StartByte.Value, SeekOrigin.Begin);
+                        }
+
+                        // On écrit les données
+                        fs.Write(data, 0, data.Length);
+                    }
+                }
+
+                Console.WriteLine($"Segment écrit pour {msg.Hash} : {data.Length} octets à la position {msg.StartByte}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de l'écriture du fichier : {ex.Message}");
+            }
         }
         public static List<Song> GetSongs()
         {
