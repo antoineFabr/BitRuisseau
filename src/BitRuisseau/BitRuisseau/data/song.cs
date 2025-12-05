@@ -2,12 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace BitRuisseau.data
 {
     public class Song: ISong
     {
+
+        [JsonIgnore]
         public string Path { get; set; }
         public string Title { get; set; }
 
@@ -16,7 +19,7 @@ namespace BitRuisseau.data
         public int Size { get; set; }
         public string[] Featuring { get; set; }
         public string Hash { get; set; }
-
+        [JsonIgnore]
         public string album { get; set; }
         public TimeSpan Duration { get; set; }
 

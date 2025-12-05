@@ -1,15 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace BitRuisseau.data
 {
-    public class Catalog
+    // Le Catalog devient une "Fiche chanson" enrichie
+    public class Catalog : Song
     {
-        public List<ISong> sons { get; set; }
+        // La liste des IP/Noms des gens qui ont cette musique
+        public List<string> Holders { get; set; } = new List<string>();
 
-        public string holder { get; set; }
+        // On enlève les anciennes propriétés 'sons' et 'holder' unique
     }
 }

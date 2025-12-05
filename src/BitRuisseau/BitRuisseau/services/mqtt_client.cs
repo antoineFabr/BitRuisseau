@@ -84,6 +84,7 @@ namespace BitRuisseau.services
                 }
                 catch (Exception ex)
                 {
+                    MessageBox.Show(ex.Message);
                     Console.WriteLine($"Erreur dans Listener(): {ex.Message}");
                 }
             };
@@ -104,7 +105,7 @@ namespace BitRuisseau.services
                     break;
 
                 case "askCatalog":
-                    SendCatalog(msg.Sender);
+                    SendCatalog(msg);
                     break;
 
                 case "sendCatalog":
@@ -215,52 +216,107 @@ namespace BitRuisseau.services
         }
         public List<Catalog> GetCatalog(Message msg)
         {
-
-            string jsonPath = Path.Combine(Application.StartupPath, "data", "Catalog.json");
-
-            // 2. Vérifier si le fichier existe pour éviter un crash
-            if (!System.IO.File.Exists(jsonPath))
-            {
-                // Gérer l'erreur ou créer un fichier vide par défaut
-                System.IO.File.WriteAllText(jsonPath, "{}");
-            }
-
-            // 3. Lire le JSON
-            string CatalogsJ = System.IO.File.ReadAllText(jsonPath);
-            MessageBox.Show(CatalogsJ);
-
-            List<Catalog> CatalogsObj = JsonSerializer.Deserialize<List<Catalog>>(CatalogsJ) ?? new List<Catalog>();
-
-
-
-            var listeModifiable = CatalogsObj.ToList();
-            List<ISong> newMusic = msg.SongList;
-
-            var cat = new Catalog() { sons = newMusic, holder = msg.Sender };
-            listeModifiable.Add(cat);
-
-            
-
-            var newJsonData = JsonSerializer.Serialize(listeModifiable, new JsonSerializerOptions { WriteIndented = true });
-
-            System.IO.File.WriteAllText(jsonPath, newJsonData);
-
-            return listeModifiable;
-        }
-
-        public async void SendCatalog(string name)
-        {
-            string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
-            string songJ = File.ReadAllText(jsonPath);
-            var songs = JsonSerializer.Deserialize<List<Song>>(songJ);
-            MessageBox.Show(songJ);
-
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
                 .First(x => x.AddressFamily == AddressFamily.InterNetwork)
                 .ToString();
-            Message msg = new Message() { Action = "sendCatalog", Sender = localIp, Recipient = name, SongList = songs };
-            string payload = JsonSerializer.Serialize(msg);
+
+            // 1. On ignore nos propres messages pour éviter les boucles
+            if (msg.Sender == localIp) return new List<Catalog>();
+
+            string jsonPath = Path.Combine(Application.StartupPath, "data", "Catalog.json");
+            List<Catalog> globalCatalog = new List<Catalog>();
+
+            // 2. Chargement du catalogue existant (Gestion d'erreur incluse)
+            if (System.IO.File.Exists(jsonPath))
+            {
+                try
+                {
+                    string jsonContent = System.IO.File.ReadAllText(jsonPath);
+                    globalCatalog = JsonSerializer.Deserialize<List<Catalog>>(jsonContent) ?? new List<Catalog>();
+                }
+                catch
+                {
+                    Console.WriteLine("Format du catalogue invalide, on repart à zéro.");
+                    globalCatalog = new List<Catalog>();
+                }
+            }
+
+            // 3. Fusion des musiques reçues
+            if (msg.SongList != null)
+            {
+                foreach (Song incomingSong in msg.SongList)
+                {
+                    // On cherche si cette musique (par son HASH) existe déjà dans notre catalogue
+                    // (On utilise le Hash car le titre peut varier légèrement mais pas le contenu)
+                    var existingEntry = globalCatalog.FirstOrDefault(c => c.Hash == incomingSong.Hash);
+
+                    if (existingEntry != null)
+                    {
+                        // CAS A : La musique existe déjà
+                        // On ajoute l'expéditeur à la liste des Holders s'il n'y est pas déjà
+                        if (!existingEntry.Holders.Contains(msg.Sender))
+                        {
+                            existingEntry.Holders.Add(msg.Sender);
+                        }
+                    }
+                    else
+                    {
+                        Catalog newEntry = new Catalog
+                        {
+                            Title = incomingSong.Title,
+                            Artist = incomingSong.Artist,
+                            Year = incomingSong.Year,
+                            Duration = incomingSong.Duration,
+                            Size = incomingSong.Size,
+                            Featuring = incomingSong.Featuring,
+                            Hash = incomingSong.Hash,
+
+                            Holders = new List<string> { msg.Sender }
+                        };
+
+                        globalCatalog.Add(newEntry);
+                    }
+                }
+            }
+
+            // 4. Sauvegarde
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string output = JsonSerializer.Serialize(globalCatalog, options);
+            System.IO.File.WriteAllText(jsonPath, output);
+
+            return globalCatalog;
+        }
+
+        public async void SendCatalog(Message msg)
+        {
+            string localIp = Dns.GetHostEntry(Dns.GetHostName())
+               .AddressList
+               .First(x => x.AddressFamily == AddressFamily.InterNetwork)
+               .ToString();
+
+            // --- FILTRE ANTI-ECHO ---
+            if (msg.Sender == localIp)
+            {
+                // C'est moi qui ai demandé le catalogue, je ne vais pas m'envoyer le mien à moi-même.
+                return;
+            }
+
+            // --- CORRECTION ICI ---
+            // Au lieu de lire le fichier manuellement (ce qui plante s'il est vide),
+            // on utilise votre méthode existante qui est sécurisée.
+            List<Song> songs = GetSongs();
+
+            // On prépare le message de réponse
+            Message newmsg = new Message()
+            {
+                Action = "sendCatalog",
+                Sender = localIp,
+                Recipient = msg.Sender,
+                SongList = songs
+            };
+
+            string payload = JsonSerializer.Serialize(newmsg);
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic("BitRuisseau")
                 .WithPayload(payload)

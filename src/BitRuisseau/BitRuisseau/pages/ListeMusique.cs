@@ -23,8 +23,10 @@ namespace BitRuisseau
         }
         mqtt_client mqttClient = new mqtt_client();
 
+
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
         string jsonPathMedia = Path.Combine(Application.StartupPath, "data", "Mediatheque.json");
+        string jsonPathCat = Path.Combine(Application.StartupPath, "data", "Catalog.json");
 
 
         private async void Connect()
@@ -75,7 +77,8 @@ namespace BitRuisseau
                             album = tfile.Tag.Album,
                             Size = (int)file.Length,
                             Artist = tfile.Tag.AlbumArtists[0],
-                            Featuring = tfile.Tag.AlbumArtists
+                            Featuring = tfile.Tag.AlbumArtists,
+                            Hash = Helper.HashFile(file.FullName)
 
 
                         };
@@ -95,6 +98,11 @@ namespace BitRuisseau
             string mediaJ = System.IO.File.ReadAllText(jsonPathMedia);
 
             Mediatheque media = JsonSerializer.Deserialize<Mediatheque>(mediaJ);
+
+            if (media == null)
+            {
+                return;
+            }
             List<string> mediaList = media.mediatheques.ToList();
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
@@ -104,6 +112,13 @@ namespace BitRuisseau
             {
                 services.Message msg = new services.Message() { Action = "askCatalog", Sender = localIp, Recipient = x };
                 mqttClient.AskCatalog(msg);
+            });
+            string ExternMusicJ = System.IO.File.ReadAllText(jsonPathCat);
+            ListeRemoteSong.Items.Clear();
+            var ExternMusic = JsonSerializer.Deserialize<List<Catalog>>(ExternMusicJ);
+            ExternMusic.ForEach(x =>
+            {
+                ListeRemoteSong.Items.Add(x.Title);
             });
         }
 
