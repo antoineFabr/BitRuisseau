@@ -150,10 +150,17 @@ namespace BitRuisseau
             string ExternMusicJ = System.IO.File.ReadAllText(jsonPathCat);
             ListeRemoteSong.Items.Clear();
             var ExternMusic = JsonSerializer.Deserialize<List<Catalog>>(ExternMusicJ);
-            ExternMusic.ForEach(x =>
+            if (ExternMusic is not null)
             {
-                ListeRemoteSong.Items.Add(x.Title);
-            });
+                ExternMusic.ForEach(x =>
+                {
+                    if (x.Title != null)
+                    {
+                        ListeRemoteSong.Items.Add(x.Title);
+                    }
+                });
+            }
+            
         }
 
         private void ListeRemoteSong_OnClickItems(object sender, EventArgs e)
