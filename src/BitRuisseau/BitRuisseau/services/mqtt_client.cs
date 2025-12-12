@@ -352,7 +352,6 @@ namespace BitRuisseau.services
                .AddressList
                .First(x => x.AddressFamily == AddressFamily.InterNetwork)
                .ToString();
-            MessageBox.Show("caca");
             // 1. Vérifier si la demande m'est destinée
             // (Note : msg.Recipient peut être une IP ou un Hostname, vérifiez les deux si besoin)
             if (msg.Recipient != localIp && msg.Recipient != "0.0.0.0") return;
@@ -494,10 +493,9 @@ namespace BitRuisseau.services
                 // 2. Convertir les données reçues (Base64 -> Bytes)
                 byte[] data = Convert.FromBase64String(msg.SongData);
 
-                // 3. Déterminer le nom du fichier et le dossier
-                // On utilise le Hash comme nom de fichier temporaire pour éviter les conflits de noms
-                // Idéalement, on renommera le fichier avec son Titre une fois fini, ou on cherche le titre via le Hash maintenant.
-                string downloadFolder = Path.Combine(Application.StartupPath, "data", "Downloads");
+                string jsonPathpath = Path.Combine(Application.StartupPath, "data", "Path.txt");
+                string downloadFolder = System.IO.File.ReadAllText(jsonPathpath);
+
 
                 // Créer le dossier Downloads s'il n'existe pas
                 if (!Directory.Exists(downloadFolder))

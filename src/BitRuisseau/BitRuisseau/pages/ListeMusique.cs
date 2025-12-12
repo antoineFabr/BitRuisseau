@@ -27,6 +27,7 @@ namespace BitRuisseau
         string jsonPath = Path.Combine(Application.StartupPath, "data", "song.json");
         string jsonPathMedia = Path.Combine(Application.StartupPath, "data", "Mediatheque.json");
         string jsonPathCat = Path.Combine(Application.StartupPath, "data", "Catalog.json");
+        string jsonPathpath = Path.Combine(Application.StartupPath, "data", "Path.txt");
 
 
         private async void Connect()
@@ -52,6 +53,7 @@ namespace BitRuisseau
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     string selectedFolder = ofd.SelectedPath;
+                    System.IO.File.WriteAllText(jsonPathpath,selectedFolder);
 
                     var songs = Directory.GetFiles(selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
                         .Where(f => f.EndsWith(".wav") || f.EndsWith(".mp3"))

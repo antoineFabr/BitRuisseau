@@ -10,7 +10,6 @@ namespace BitRuisseau.data
     public class Song: ISong
     {
 
-        [JsonIgnore]
         public string Path { get; set; }
         public string Title { get; set; }
 
@@ -21,6 +20,8 @@ namespace BitRuisseau.data
         public string Hash { get; set; }
         [JsonIgnore]
         public string album { get; set; }
+
+        
         public TimeSpan Duration { get; set; }
         public string Extension { get; set; }
 
