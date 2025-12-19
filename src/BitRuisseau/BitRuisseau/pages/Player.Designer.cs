@@ -28,53 +28,65 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.lblTitle = new System.Windows.Forms.Label();
-            this.btnPlayPause = new System.Windows.Forms.Button();
-            this.btnStop = new System.Windows.Forms.Button();
-            this.SuspendLayout();
+            lblTitle = new Label();
+            btnPlayPause = new Button();
+            btnStop = new Button();
+            waveViewer = new NAudio.Gui.WaveViewer();
+            SuspendLayout();
             // 
             // lblTitle
             // 
-            this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.lblTitle.Location = new System.Drawing.Point(30, 30);
-            this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(100, 25);
-            this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "No Song";
+            lblTitle.AutoSize = true;
+            lblTitle.Font = new Font("Segoe UI", 12F);
+            lblTitle.Location = new Point(223, 20);
+            lblTitle.Name = "lblTitle";
+            lblTitle.Size = new Size(71, 21);
+            lblTitle.TabIndex = 0;
+            lblTitle.Text = "No Song";
             // 
             // btnPlayPause
             // 
-            this.btnPlayPause.Location = new System.Drawing.Point(30, 80);
-            this.btnPlayPause.Name = "btnPlayPause";
-            this.btnPlayPause.Size = new System.Drawing.Size(100, 40);
-            this.btnPlayPause.TabIndex = 1;
-            this.btnPlayPause.Text = "Play/Pause";
-            this.btnPlayPause.UseVisualStyleBackColor = true;
-            this.btnPlayPause.Click += new System.EventHandler(this.btnPlayPause_Click);
+            btnPlayPause.Location = new Point(161, 243);
+            btnPlayPause.Name = "btnPlayPause";
+            btnPlayPause.Size = new Size(100, 40);
+            btnPlayPause.TabIndex = 1;
+            btnPlayPause.Text = "Play/Pause";
+            btnPlayPause.UseVisualStyleBackColor = true;
+            btnPlayPause.Click += btnPlayPause_Click;
             // 
             // btnStop
             // 
-            this.btnStop.Location = new System.Drawing.Point(150, 80);
-            this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(100, 40);
-            this.btnStop.TabIndex = 2;
-            this.btnStop.Text = "Stop";
-            this.btnStop.UseVisualStyleBackColor = true;
-            this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
+            btnStop.Location = new Point(267, 243);
+            btnStop.Name = "btnStop";
+            btnStop.Size = new Size(100, 40);
+            btnStop.TabIndex = 2;
+            btnStop.Text = "Stop";
+            btnStop.UseVisualStyleBackColor = true;
+            btnStop.Click += btnStop_Click;
+            // 
+            // waveViewer
+            // 
+            waveViewer.Location = new Point(12, 117);
+            waveViewer.Name = "waveViewer";
+            waveViewer.SamplesPerPixel = 128;
+            waveViewer.Size = new Size(536, 97);
+            waveViewer.StartPosition = 0L;
+            waveViewer.TabIndex = 3;
+            waveViewer.WaveStream = null;
             // 
             // Player
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(400, 200);
-            this.Controls.Add(this.btnStop);
-            this.Controls.Add(this.btnPlayPause);
-            this.Controls.Add(this.lblTitle);
-            this.Name = "Player";
-            this.Text = "Player";
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(551, 307);
+            Controls.Add(waveViewer);
+            Controls.Add(btnStop);
+            Controls.Add(btnPlayPause);
+            Controls.Add(lblTitle);
+            Name = "Player";
+            Text = "Player";
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
@@ -82,5 +94,6 @@
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Button btnPlayPause;
         private System.Windows.Forms.Button btnStop;
+        private NAudio.Gui.WaveViewer waveViewer;
     }
 }

@@ -1,15 +1,16 @@
-﻿using System;
+﻿using BitRuisseau.data;
+using NAudio.Gui;
+using NAudio.Wave;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Runtime.InteropServices;
-using BitRuisseau.data;
-using NAudio.Wave;
 
 namespace BitRuisseau
 {
@@ -19,6 +20,7 @@ namespace BitRuisseau
         private bool isPlaying = false;
         private AudioFileReader audioFile;
         private WaveOutEvent outputDevice;
+        private AudioFileReader displayStream;
 
         public Player(Song song)
         {
@@ -29,7 +31,9 @@ namespace BitRuisseau
             PlayMusic(currentSong.Path);
             isPlaying = true;
             btnPlayPause.Text = "Pause";
+            waveViewer.Dock = DockStyle.Top;
             
+
 
         }
 
@@ -37,9 +41,18 @@ namespace BitRuisseau
         {
             try
             {
-                outputDevice = new WaveOutEvent();
+
+                DisposeAudio();
+
+                // Flux pour la carte son
                 audioFile = new AudioFileReader(path);
+                outputDevice = new WaveOutEvent();
                 outputDevice.Init(audioFile);
+
+                // Flux séparé pour le dessin du WaveViewer
+                displayStream = new AudioFileReader(path);
+                waveViewer.WaveStream = displayStream;
+
                 outputDevice.Play();
             }
             catch (Exception ex)
@@ -54,7 +67,18 @@ namespace BitRuisseau
             isPlaying = false;
             btnPlayPause.Text = "Play";
         }
+        private void DisposeAudio()
+        {
+            outputDevice?.Stop();
+            outputDevice?.Dispose();
+            outputDevice = null;
 
+            audioFile?.Dispose();
+            audioFile = null;
+
+            displayStream?.Dispose(); // Ne pas oublier celui-ci
+            displayStream = null;
+        }
         private void btnPlayPause_Click(object sender, EventArgs e)
         {
             if (isPlaying)
