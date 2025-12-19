@@ -1,4 +1,4 @@
-using BitRuisseau.data;
+ï»¿using BitRuisseau.data;
 using BitRuisseau.services;
 using MQTTnet;
 using System.Net;
@@ -11,15 +11,19 @@ namespace BitRuisseau
 {
     public partial class Form1 : Form
     {
+        private List<Song> existSongs = new List<Song>();
+
         public Form1()
         {
             InitializeComponent();
 
             string ExistSongJ = System.IO.File.ReadAllText(jsonPath);
 
-            List<Song> ExistSong = mqtt_client.GetSongs();
+            existSongs = mqtt_client.GetSongs();
             Connect();
-            ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
+            existSongs.ForEach(x => ListeSong.Items.Add(x.Title));
+
+            ListeSong.DoubleClick += ListeSong_DoubleClick;
         }
         mqtt_client mqttClient = new mqtt_client();
 
@@ -41,7 +45,7 @@ namespace BitRuisseau
             }
             else
             {
-                MessageBox.Show("Connexion réussi au broker mqtt");
+                MessageBox.Show("Connexion rÃ©ussi au broker mqtt");
 
             }
         }
@@ -73,7 +77,7 @@ namespace BitRuisseau
                             var tfile = TagLib.File.Create(x);
 
                             // --- CORRECTION CRASH ARTISTE ---
-                            // On vérifie si AlbumArtists contient quelque chose, sinon on cherche Performers, sinon "Inconnu"
+                            // On vÃ©rifie si AlbumArtists contient quelque chose, sinon on cherche Performers, sinon "Inconnu"
                             string safeArtist = "Artiste Inconnu";
                             if (tfile.Tag.AlbumArtists != null && tfile.Tag.AlbumArtists.Length > 0)
                             {
@@ -96,18 +100,18 @@ namespace BitRuisseau
                                 Title = safeTitle,
                                 Duration = tfile.Properties.Duration,
                                 Year = (int)tfile.Tag.Year,
-                                album = tfile.Tag.Album ?? "Album Inconnu", // Sécurité null
+                                album = tfile.Tag.Album ?? "Album Inconnu", // SÃ©curitÃ© null
                                 Size = (int)file.Length,
 
-                                // Utilisation de la variable sécurisée
+                                // Utilisation de la variable sÃ©curisÃ©e
                                 Artist = safeArtist,
 
-                                // On garde le tableau complet pour le featuring, mais on vérifie null
+                                // On garde le tableau complet pour le featuring, mais on vÃ©rifie null
                                 Featuring = tfile.Tag.AlbumArtists ?? new string[0],
 
                                 Hash = Helper.HashFile(file.FullName),
 
-                                // IMPORTANT : On ajoute l'extension pour le téléchargement futur
+                                // IMPORTANT : On ajoute l'extension pour le tÃ©lÃ©chargement futur
                                 Extension = file.Extension
                             };
 
@@ -176,8 +180,22 @@ namespace BitRuisseau
 
         private void ListeSong_DoubleClick(object sender, EventArgs e)
         {
-           
+            if (ListeSong.SelectedItem == null) return;
+            string selectedTitle = ListeSong.SelectedItem.ToString();
+            var song = existSongs.FirstOrDefault(s => s.Title == selectedTitle);
 
+            if (song != null)
+            {
+                if (System.IO.File.Exists(song.Path))
+                {
+                     Player player = new Player(song);
+                     player.Show();
+                }
+                else
+                {
+                    MessageBox.Show($"Fichier introuvable: {song.Path}");
+                }
+            }
         }
 
         private void ListeRemoteSong_DoubleClick(object sender, EventArgs e)
@@ -185,7 +203,7 @@ namespace BitRuisseau
             MessageBox.Show("Click double download");
             if (ListeRemoteSong.SelectedItem == null) return;
 
-            // 2. Récupérer le titre sur lequel on a cliqué
+            // 2. RÃ©cupÃ©rer le titre sur lequel on a cliquÃ©
             string selectedTitle = ListeRemoteSong.SelectedItem.ToString();
 
             // 3. Charger le fichier Catalog.json pour retrouver les infos techniques (Hash, Holders...)
@@ -202,16 +220,16 @@ namespace BitRuisseau
                 string jsonContent = System.IO.File.ReadAllText(jsonPathCat);
                 List<Catalog> globalCatalog = JsonSerializer.Deserialize<List<Catalog>>(jsonContent);
 
-                // 4. Trouver l'objet Catalog qui correspond au titre sélectionné
-                // Note : Si deux musiques ont le même titre, cela prendra la première trouvée.
+                // 4. Trouver l'objet Catalog qui correspond au titre sÃ©lectionnÃ©
+                // Note : Si deux musiques ont le mÃªme titre, cela prendra la premiÃ¨re trouvÃ©e.
                 var songToDownload = globalCatalog.FirstOrDefault(c => c.Title == selectedTitle);
 
                 if (songToDownload != null)
                 {
                     // Feedback visuel pour l'utilisateur
-                    MessageBox.Show($"Demande de téléchargement envoyée pour : {songToDownload.Title}\nSources disponibles : {songToDownload.Holders.Count}");
+                    MessageBox.Show($"Demande de tÃ©lÃ©chargement envoyÃ©e pour : {songToDownload.Title}\nSources disponibles : {songToDownload.Holders.Count}");
 
-                    // 5. Lancer le téléchargement via MQTT
+                    // 5. Lancer le tÃ©lÃ©chargement via MQTT
                     mqttClient.DownloadSong(songToDownload);
                 }
                 else

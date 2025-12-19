@@ -44,6 +44,7 @@
             ListeSong.Name = "ListeSong";
             ListeSong.Size = new Size(261, 229);
             ListeSong.TabIndex = 0;
+            ListeSong.Click += ListeSong_DoubleClick;
             ListeSong.SelectedIndexChanged += ListeSong_SelectedIndexChanged;
             ListeSong.DoubleClick += ListeSong_DoubleClick;
             // 

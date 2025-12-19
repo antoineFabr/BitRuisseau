@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="MQTTnet" Version="5.0.1.1416" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="taglib-sharp-netstandard2.0" Version="2.1.0" />
   </ItemGroup>
 
