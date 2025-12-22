@@ -143,6 +143,10 @@ namespace BitRuisseau
             {
                 return;
             }
+            if(media.mediatheques == null)
+            {
+                return;
+            }
             List<string> mediaList = media.mediatheques.ToList();
             string localIp = Dns.GetHostEntry(Dns.GetHostName())
                 .AddressList
