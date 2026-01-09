@@ -21,7 +21,14 @@ namespace BitRuisseau
 
             existSongs = mqtt_client.GetSongs();
             Connect();
-            existSongs.ForEach(x => ListeSong.Items.Add(x.Title));
+            existSongs.ForEach(x => {
+                var item = new ListViewItem(x.Title);
+                item.SubItems.Add(x.Artist);
+                item.SubItems.Add(x.album);
+                item.SubItems.Add(x.Duration.ToString(@"mm\:ss"));
+                item.SubItems.Add((x.Size / 1024 / 1024f).ToString("0.0") + " MB");
+                ListeSong.Items.Add(item);
+            });
 
             ListeSong.DoubleClick += ListeSong_DoubleClick;
         }
@@ -128,7 +135,14 @@ namespace BitRuisseau
 
                     // Vide la liste avant de la remplir
                     ListeSong.Items.Clear();
-                    ExistSong.ForEach(x => ListeSong.Items.Add(x.Title));
+                    ExistSong.ForEach(x => {
+                        var item = new ListViewItem(x.Title);
+                        item.SubItems.Add(x.Artist);
+                        item.SubItems.Add(x.album);
+                        item.SubItems.Add(x.Duration.ToString(@"mm\:ss"));
+                        item.SubItems.Add((x.Size / 1024 / 1024f).ToString("0.0") + " MB");
+                        ListeSong.Items.Add(item);
+                    });
                 }
             }
         }
@@ -166,7 +180,13 @@ namespace BitRuisseau
                 {
                     if (x.Title != null)
                     {
-                        ListeRemoteSong.Items.Add(x.Title);
+                        var item = new ListViewItem(x.Title);
+                        item.SubItems.Add(x.Artist ?? "Inconnu");
+                        item.SubItems.Add(x.album ?? "Inconnu");
+                        item.SubItems.Add(x.Duration.ToString(@"mm\:ss"));
+                        item.SubItems.Add((x.Size / 1024 / 1024f).ToString("0.0") + " MB");
+                        item.SubItems.Add(x.Holders.Count.ToString());
+                        ListeRemoteSong.Items.Add(item);
                     }
                 });
             }
@@ -184,8 +204,8 @@ namespace BitRuisseau
 
         private void ListeSong_DoubleClick(object sender, EventArgs e)
         {
-            if (ListeSong.SelectedItem == null) return;
-            string selectedTitle = ListeSong.SelectedItem.ToString();
+            if (ListeSong.SelectedItems.Count == 0) return;
+            string selectedTitle = ListeSong.SelectedItems[0].Text;
             var song = existSongs.FirstOrDefault(s => s.Title == selectedTitle);
 
             if (song != null)
@@ -205,10 +225,10 @@ namespace BitRuisseau
         private void ListeRemoteSong_DoubleClick(object sender, EventArgs e)
         {
             MessageBox.Show("Click double download");
-            if (ListeRemoteSong.SelectedItem == null) return;
+            if (ListeRemoteSong.SelectedItems.Count == 0) return;
 
             // 2. Récupérer le titre sur lequel on a cliqué
-            string selectedTitle = ListeRemoteSong.SelectedItem.ToString();
+            string selectedTitle = ListeRemoteSong.SelectedItems[0].Text;
 
             // 3. Charger le fichier Catalog.json pour retrouver les infos techniques (Hash, Holders...)
             string jsonPathCat = Path.Combine(Application.StartupPath, "data", "Catalog.json");
